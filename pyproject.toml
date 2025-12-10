@@ -101,4 +101,23 @@ exclude = [
 [tool.pytest.ini_options]
 testpaths = ["packages/fraud_detection/tests", "packages/infra/tests"]
 pythonpath = ["."]
-addopts = "-v --cov=packages --cov-report=term-missing"
+addopts = "-v --cov=packages --cov-report=term-missing --cov-fail-under=100"
+
+[tool.coverage.run]
+omit = [
+    "*/tests/*",
+    "*/__pycache__/*",
+    "*/cli.py",
+    "*/jobs/*",
+    "*/utils/*",
+    "packages/infra/*",
+    "packages/docs/*",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "if __name__ == .__main__.:",
+    "raise ValueError",
+]

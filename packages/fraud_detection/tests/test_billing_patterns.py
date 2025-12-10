@@ -132,3 +132,89 @@ class TestBillingPatternRules:
         normal_flagged = result.filter((result.provider_id == "PRV_NORMAL") & (result.round_amount_flag)).count()
 
         assert normal_flagged == 0
+
+    def test_procedure_unbundling_detected(
+        self,
+        rules: BillingPatternRules,
+        spark: SparkSession,
+        claims_schema: StructType,
+    ) -> None:
+        """Test detection of procedure unbundling."""
+        from pyspark.sql.types import StringType, StructField
+        from pyspark.sql.types import StructType as ST
+
+        d = Decimal
+        # Create bundled procedures reference table
+        bundled_schema = ST(
+            [
+                StructField("bundled_code", StringType(), False),
+                StructField("unbundled_code_1", StringType(), False),
+                StructField("unbundled_code_2", StringType(), False),
+            ]
+        )
+        bundled_data = [
+            ("80053", "80048", "80076"),  # Comprehensive metabolic panel components
+            ("85025", "85027", "85004"),  # CBC components
+        ]
+        bundled_procedures = spark.createDataFrame(bundled_data, bundled_schema)
+
+        # Claims data
+        data = [
+            # Patient with unbundled procedures (80048 + 80076 on same day)
+            ("CLM001", "PAT_UNBUNDLE", "PRV001", "80048", date(2024, 1, 15), d("50.00"), "CA", "CA"),
+            ("CLM002", "PAT_UNBUNDLE", "PRV001", "80076", date(2024, 1, 15), d("75.00"), "CA", "CA"),
+            # Normal patient without unbundling
+            ("CLM003", "PAT_NORMAL", "PRV001", "99213", date(2024, 1, 15), d("100.00"), "CA", "CA"),
+            ("CLM004", "PAT_NORMAL", "PRV001", "36415", date(2024, 1, 15), d("25.00"), "CA", "CA"),
+        ]
+        claims = spark.createDataFrame(data, claims_schema)  # type: ignore[arg-type]
+
+        result = rules.check_procedure_unbundling(claims, bundled_procedures)
+
+        # Check columns exist
+        assert "procedures_same_day" in result.columns
+        assert "unbundling_flag" in result.columns
+
+        # Unbundled claims should be flagged
+        unbundle_flagged = result.filter((result.patient_id == "PAT_UNBUNDLE") & (result.unbundling_flag)).count()
+        assert unbundle_flagged > 0
+
+        # Normal patient should not be flagged
+        normal_flagged = result.filter((result.patient_id == "PAT_NORMAL") & (result.unbundling_flag)).count()
+        assert normal_flagged == 0
+
+    def test_procedure_unbundling_no_match(
+        self,
+        rules: BillingPatternRules,
+        spark: SparkSession,
+        claims_schema: StructType,
+    ) -> None:
+        """Test unbundling check with no matching unbundled pairs."""
+        from pyspark.sql.types import StringType, StructField
+        from pyspark.sql.types import StructType as ST
+
+        d = Decimal
+        bundled_schema = ST(
+            [
+                StructField("bundled_code", StringType(), False),
+                StructField("unbundled_code_1", StringType(), False),
+                StructField("unbundled_code_2", StringType(), False),
+            ]
+        )
+        bundled_data = [
+            ("80053", "80048", "80076"),
+        ]
+        bundled_procedures = spark.createDataFrame(bundled_data, bundled_schema)
+
+        # Claims without unbundling
+        data = [
+            ("CLM001", "PAT001", "PRV001", "99213", date(2024, 1, 15), d("100.00"), "CA", "CA"),
+            ("CLM002", "PAT001", "PRV001", "99214", date(2024, 1, 15), d("150.00"), "CA", "CA"),
+        ]
+        claims = spark.createDataFrame(data, claims_schema)  # type: ignore[arg-type]
+
+        result = rules.check_procedure_unbundling(claims, bundled_procedures)
+
+        # No claims should be flagged
+        flagged = result.filter(result.unbundling_flag).count()
+        assert flagged == 0
