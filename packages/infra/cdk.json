@@ -1,5 +1,5 @@
 {
-  "app": "python src/infra/app.py",
+  "app": "uv run python src/infra/app.py",
   "watch": {
     "include": ["**"],
     "exclude": [

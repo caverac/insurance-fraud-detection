@@ -132,7 +132,9 @@ jobs:
         run: uv sync --frozen
 
       - name: Install Node dependencies
+        working-directory: packages/infra
         run: yarn install --immutable
 
       - name: CDK Synth
-        run: yarn cdk:synth
+        working-directory: packages/infra
+        run: yarn synth
