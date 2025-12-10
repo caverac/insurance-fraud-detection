@@ -1,0 +1,98 @@
+site_name: Insurance Fraud Detection
+site_description: PySpark-based fraud detection system for insurance claims
+site_author: Your Name
+repo_url: https://github.com/your-org/insurance-fraud
+repo_name: insurance-fraud
+
+theme:
+  name: material
+  palette:
+    - scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - content.tabs.link
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: [../fraud_detection/src]
+          options:
+            show_source: true
+            show_root_heading: true
+            show_category_heading: true
+            docstring_style: google
+
+markdown_extensions:
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.arithmatex:
+      generic: true
+  - admonition
+  - pymdownx.details
+  - attr_list
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+
+extra_javascript:
+  - javascripts/mathjax.js
+  - https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js
+
+nav:
+  - Home: index.md
+  - Getting Started:
+      - Installation: getting-started/installation.md
+      - Quick Start: getting-started/quickstart.md
+      - Configuration: getting-started/configuration.md
+  - User Guide:
+      - Overview: guide/overview.md
+      - Rule-Based Detection: guide/rules.md
+      - Statistical Detection: guide/statistics.md
+      - Duplicate Detection: guide/duplicates.md
+      - Running Jobs: guide/jobs.md
+  - Architecture:
+      - System Design: architecture/design.md
+      - Data Flow: architecture/data-flow.md
+      - AWS Infrastructure: architecture/aws.md
+  - API Reference:
+      - Detector: api/detector.md
+      - Rules: api/rules.md
+      - Statistics: api/statistics.md
+  - Development:
+      - Contributing: development/contributing.md
+      - Testing: development/testing.md
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/your-org/insurance-fraud

@@ -1,0 +1,29 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "fraud-detection"
+version = "0.1.0"
+description = "PySpark fraud detection for insurance claims"
+requires-python = ">=3.13"
+dependencies = [
+    "pyspark>=3.5.0",
+    "numpy>=1.26.0",
+    "pandas>=2.0.0",
+    "scipy>=1.11.0",
+    "pyarrow>=14.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-cov>=4.0.0",
+    "chispa>=0.10.0",  # PySpark testing utilities
+]
+
+[project.scripts]
+fraud-detect = "fraud_detection.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/fraud_detection"]

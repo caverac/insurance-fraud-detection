@@ -1,0 +1,104 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "insurance-fraud-detection"
+version = "0.1.0"
+description = "Insurance claims fraud detection using PySpark on AWS"
+readme = "README.md"
+requires-python = ">=3.13,<3.14"
+license = "MIT"
+authors = [
+    { name = "Your Name", email = "you@example.com" }
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.13",
+]
+dependencies = [
+    "fraud-detection",
+    "infra",
+    "fraud-detection-docs",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-cov>=4.0.0",
+    "black>=24.0.0",
+    "pylint>=3.3.0",
+    "flake8>=7.1.0",
+    "flake8-bugbear>=24.0.0",
+    "flake8-comprehensions>=3.15.0",
+    "pydocstyle>=6.3.0",
+    "isort>=5.13.0",
+    "mypy>=1.13.0",
+    "pre-commit>=4.0.0",
+    "chispa>=0.10.0",
+]
+
+[tool.uv]
+
+[tool.uv.workspace]
+members = ["packages/*"]
+
+[tool.uv.sources]
+fraud-detection = { workspace = true }
+infra = { workspace = true }
+fraud-detection-docs = { workspace = true }
+
+[tool.hatch.build.targets.wheel]
+packages = ["packages/*"]
+
+[tool.black]
+target-version = ["py313"]
+line-length = 150
+
+[tool.isort]
+profile = "black"
+line_length = 150
+known_first_party = ["fraud_detection", "infra", "docs"]
+
+[tool.pylint.main]
+py-version = "3.13"
+jobs = 0
+ignore-paths = [".*/__pycache__/.*", ".*/tests/.*", "packages/docs/.*"]
+ignore-patterns = ["test_.*\\.py", "conftest\\.py"]
+
+[tool.pylint.format]
+max-line-length = 150
+
+[tool.pylint.messages_control]
+disable = [
+    "too-few-public-methods",
+    "too-many-instance-attributes",
+    "too-many-locals",
+    "duplicate-code",
+]
+
+[tool.pylint.design]
+max-args = 10
+
+[tool.pydocstyle]
+convention = "numpy"
+add-ignore = ["D100", "D104", "D105"]
+
+[tool.mypy]
+python_version = "3.13"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+exclude = [
+    "__pycache__",
+    "\\.pyc$",
+    "packages/docs/",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["packages/fraud_detection/tests", "packages/infra/tests"]
+pythonpath = ["."]
+addopts = "-v --cov=packages --cov-report=term-missing"
