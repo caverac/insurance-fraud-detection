@@ -66,6 +66,13 @@ def main() -> int:
         choices=["summary", "providers", "benfords"],
         help="Type of analysis report",
     )
+    analyze_parser.add_argument(
+        "--format",
+        "-f",
+        default="csv",
+        choices=["csv", "parquet", "json"],
+        help="Format of results data (default: csv)",
+    )
 
     # Generate sample data command
     sample_parser = subparsers.add_parser(
@@ -138,7 +145,12 @@ def run_detection(args: argparse.Namespace) -> int:
 
         # Write results
         if args.format == "csv":
-            results.write.mode("overwrite").option("header", "true").csv(args.output)
+            # Convert array columns to strings for CSV compatibility
+            csv_results = results
+            for field in results.schema.fields:
+                if "ArrayType" in str(field.dataType):
+                    csv_results = csv_results.withColumn(field.name, F.concat_ws(", ", F.col(field.name)))
+            csv_results.write.mode("overwrite").option("header", "true").csv(args.output)
         elif args.format == "json":
             results.write.mode("overwrite").json(args.output)
         else:
@@ -158,9 +170,16 @@ def run_detection(args: argparse.Namespace) -> int:
 def run_analysis(args: argparse.Namespace) -> int:
     """Run analysis on fraud detection results."""
     spark = SparkSession.builder.appName("FraudAnalysis").master("local[*]").getOrCreate()
+    spark.sparkContext.setLogLevel("ERROR")
 
     try:
-        results = spark.read.parquet(args.results)
+        # Read results in the specified format
+        if args.format == "csv":
+            results = spark.read.option("header", "true").option("inferSchema", "true").csv(args.results)
+        elif args.format == "json":
+            results = spark.read.json(args.results)
+        else:
+            results = spark.read.parquet(args.results)
 
         if args.report == "summary":
             logger.info("Generating fraud detection summary report")
@@ -212,7 +231,7 @@ def generate_sample(args: argparse.Namespace) -> int:
 
     try:
         generate_sample_claims(
-            args.output_path,
+            args.output,
             num_claims=args.num_claims,
             fraud_rate=args.fraud_rate,
         )

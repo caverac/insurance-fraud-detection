@@ -43,20 +43,18 @@ make analyze
 Example output:
 
 ```
-=== Fraud Detection Summary ===
-
-Total claims analyzed: 10,000
-High risk (>0.7):      312 (3.1%)
-Medium risk (0.3-0.7): 847 (8.5%)
-Low risk (≤0.3):       8,841 (88.4%)
-
-=== Score Distribution ===
-
-+------+-------+-----+-----+
-| mean | stddev| min | max |
-+------+-------+-----+-----+
-| 0.12 |  0.23 | 0.0 | 0.95|
-+------+-------+-----+-----+
+INFO:fraud_detection.cli:Generating fraud detection summary report
+INFO:fraud_detection.cli:Fraud Detection Summary
+INFO:fraud_detection.cli:Total claims analyzed: 10092
+INFO:fraud_detection.cli:High risk (>0.7):      1 (0.0%)
+INFO:fraud_detection.cli:Medium risk (0.3-0.7): 91 (0.9%)
+INFO:fraud_detection.cli:Low risk (<=0.3):      10000 (99.1%)
+INFO:fraud_detection.cli:Score Distribution
++-------+-------+-------+-------+
+|   mean| stddev|    min|    max|
++-------+-------+-------+-------+
+|  0.022|  0.057|   0.0 |  0.717|
++-------+-------+-------+-------+
 ```
 
 ## View High-Risk Providers
@@ -83,7 +81,7 @@ spark = SparkSession.builder \
     .getOrCreate()
 
 # Load claims data
-claims = spark.read.option("header", "true").csv("./sample_data")
+claims = spark.read.option("header", "true").csv("/tmp/sample_data")
 
 # Configure detection
 config = DetectionConfig(

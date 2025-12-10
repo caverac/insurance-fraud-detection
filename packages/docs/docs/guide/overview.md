@@ -66,6 +66,8 @@ Where:
 - `statistical_score`: Fraction of statistical flags (0-1)
 - `duplicate_score`: 1.0 if duplicate, 0.0 otherwise
 
+These weights are somewhat arbitrary
+
 ## Risk Categories
 
 Based on fraud score, claims are categorized:
@@ -119,3 +121,9 @@ The system is designed for extension:
 - Adjust scoring weights via `DetectionConfig`
 
 See [Development Guide](../development/contributing.md) for details.
+
+
+## ML Integration
+Most of the weights and thresholds are somewhat arbitrary and can be optimized using machine learning techniques. For instance, the rule-based detection can be enhanced by training a model to predict fraud based on historical data. Similarly, the statistical detection methods can be refined to better capture fraudulent patterns.
+
+This is just for demonstration purposes, and the actual implementation would involve more detailed steps and considerations.

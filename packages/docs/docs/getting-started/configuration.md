@@ -55,31 +55,22 @@ config = DetectionConfig(
 )
 
 detector = FraudDetector(spark, config)
+results = detector.detect(claims)
 ```
 
 ### Command Line
 
+The CLI currently uses default configuration values:
+
 ```bash
-fraud-detect run \
+uv run fraud-detect run \
     --input ./data \
     --output ./results \
-    --zscore-threshold 2.5 \
-    --duplicate-threshold 0.85 \
+    --format csv \
     --local
 ```
 
-### Spark Job Arguments
-
-When submitting to EMR:
-
-```bash
-spark-submit \
-    fraud_detection.py \
-    --zscore-threshold 2.5 \
-    --iqr-multiplier 1.5 \
-    --duplicate-threshold 0.85 \
-    --min-fraud-score 0.3
-```
+For custom configurations, use the Python API directly or create a custom job script.
 
 ## Tuning Recommendations
 
@@ -89,9 +80,9 @@ For environments where false positives are costly:
 
 ```python
 config = DetectionConfig(
-    outlier_zscore_threshold=4.0,      # Stricter outlier threshold
+    outlier_zscore_threshold=4.0,       # Stricter outlier threshold
     duplicate_similarity_threshold=0.95, # Higher similarity required
-    weight_duplicate=0.5,               # Emphasize duplicates
+    weight_duplicate=0.5,                # Emphasize duplicates
 )
 ```
 
@@ -101,7 +92,7 @@ For environments where missing fraud is costly:
 
 ```python
 config = DetectionConfig(
-    outlier_zscore_threshold=2.0,       # More sensitive
+    outlier_zscore_threshold=2.0,        # More sensitive
     duplicate_similarity_threshold=0.8,  # Lower similarity threshold
     max_daily_procedures_per_provider=30, # Stricter limits
 )
@@ -125,50 +116,36 @@ pt_config = DetectionConfig(
 )
 ```
 
-## Environment Variables
+## Custom Job Script
 
-Configuration can also be set via environment variables:
-
-```bash
-export FRAUD_ZSCORE_THRESHOLD=3.0
-export FRAUD_DUPLICATE_THRESHOLD=0.9
-export FRAUD_MAX_DAILY_PROCEDURES=50
-```
-
-## Configuration File
-
-For complex configurations, use a YAML file:
-
-```yaml
-# config.yaml
-outlier:
-  zscore_threshold: 3.0
-  iqr_multiplier: 1.5
-
-duplicates:
-  similarity_threshold: 0.9
-  time_window_days: 30
-
-billing_rules:
-  max_daily_procedures: 50
-  max_patient_claims_per_day: 5
-
-scoring:
-  rule_weight: 0.3
-  statistical_weight: 0.25
-  duplicate_weight: 0.45
-```
-
-Load with:
+For production use with custom configuration, create a job script:
 
 ```python
-import yaml
+# jobs/detect_fraud.py
+from pyspark.sql import SparkSession
+from fraud_detection.detector import DetectionConfig, FraudDetector
 
-with open("config.yaml") as f:
-    cfg = yaml.safe_load(f)
+def main():
+    spark = SparkSession.builder.appName("FraudDetection").getOrCreate()
 
-config = DetectionConfig(
-    outlier_zscore_threshold=cfg["outlier"]["zscore_threshold"],
-    # ... etc
-)
+    config = DetectionConfig(
+        outlier_zscore_threshold=2.5,
+        duplicate_similarity_threshold=0.85,
+    )
+
+    claims = spark.read.parquet("s3://bucket/claims/")
+    detector = FraudDetector(spark, config)
+    results = detector.detect(claims)
+    results.write.parquet("s3://bucket/results/")
+
+    spark.stop()
+
+if __name__ == "__main__":
+    main()
+```
+
+Submit to EMR:
+
+```bash
+spark-submit jobs/detect_fraud.py
 ```

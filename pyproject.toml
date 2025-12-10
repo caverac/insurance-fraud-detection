@@ -110,7 +110,7 @@ omit = [
     "*/cli.py",
     "*/jobs/*",
     "*/utils/*",
-    "packages/infra/*",
+    "packages/infra/src/*",
     "packages/docs/*",
 ]
 

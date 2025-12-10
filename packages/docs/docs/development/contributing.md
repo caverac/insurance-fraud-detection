@@ -6,8 +6,8 @@
 2. Install dependencies with uv
 
 ```bash
-git clone https://github.com/your-org/insurance-fraud.git
-cd insurance-fraud
+git clone https://github.com/caveraio/insurance-fraud-detection.git
+cd insurance-fraud-detection
 
 # Install all dependencies (Python + Node.js + pre-commit hooks)
 make install
@@ -18,7 +18,7 @@ Or manually:
 ```bash
 uv sync
 uv run pre-commit install
-yarn install
+cd packages/infra && yarn install
 ```
 
 ## Code Style
@@ -44,8 +44,8 @@ We use Pylint, Flake8, and pydocstyle (NumPy convention):
 make lint
 # Or manually:
 uv run flake8 packages/
-uv run pylint packages/fraud_detection/src packages/infra/src
-uv run pydocstyle packages/fraud_detection/src packages/infra/src --convention=numpy
+uv run pylint packages/
+uv run pydocstyle packages/
 ```
 
 ### Type Hints
@@ -65,7 +65,7 @@ Run type checking:
 
 ```bash
 make type-check
-# Or: uv run mypy packages/fraud_detection/src packages/infra/src
+# Or: uv run mypy packages/
 ```
 
 ### Docstrings
@@ -113,18 +113,16 @@ def calculate_fraud_score(
 make test
 # Or: uv run pytest
 
-# Run with coverage
-make test-cov
-
 # Run specific package tests
 uv run pytest packages/fraud_detection/tests/
-
-# Run specific test file
-uv run pytest packages/fraud_detection/tests/test_outliers.py
 
 # Run specific test
 uv run pytest packages/fraud_detection/tests/test_outliers.py::TestOutlierDetector::test_zscore_outliers_detected
 ```
+
+### Coverage Requirements
+
+The project requires 100% code coverage. Tests will fail if coverage drops below this threshold.
 
 ### Writing Tests
 
@@ -153,21 +151,6 @@ class TestOutlierDetector:
         )
         outliers = result.filter(result.is_outlier).count()
         assert outliers > 0
-```
-
-### Test Data
-
-Use fixtures for test data:
-
-```python
-@pytest.fixture
-def sample_claims(spark: SparkSession, claims_schema):
-    """Create sample claims for testing."""
-    data = [
-        ("CLM001", "PAT001", "PRV001", "99213", date(2024, 1, 15), Decimal("100.00")),
-        # ...
-    ]
-    return spark.createDataFrame(data, claims_schema)
 ```
 
 ## Pull Request Process
@@ -200,20 +183,20 @@ refactor: simplify outlier detection interface
 
 ### PR Checklist
 
-- [ ] Tests pass
-- [ ] Code is formatted (black + isort)
-- [ ] Linting passes (pylint + flake8 + pydocstyle)
-- [ ] Type hints added
+- [ ] Tests pass (`uv run pytest`)
+- [ ] 100% code coverage maintained
+- [ ] Code is formatted (`uv run black packages/ && uv run isort packages/`)
+- [ ] Linting passes (`make lint`)
+- [ ] Type hints added (`uv run mypy packages/`)
 - [ ] Docstrings updated (NumPy style)
-- [ ] Documentation updated
-- [ ] CHANGELOG updated
+- [ ] Documentation updated if needed
 
 ## Adding New Detection Methods
 
 ### 1. Create the Module
 
 ```python
-# packages/fraud_detection/src/fraud_detection/rules/my_rules.py
+# packages/fraud_detection/src/fraud_detection/rules/<module_name>.py
 from pyspark.sql import DataFrame
 
 class MyCustomRules:
@@ -230,7 +213,7 @@ class MyCustomRules:
 ### 2. Add Tests
 
 ```python
-# packages/fraud_detection/tests/test_my_rules.py
+# packages/fraud_detection/tests/test_<module_name>.py
 class TestMyCustomRules:
     def test_detects_pattern(self, spark, sample_claims):
         rules = MyCustomRules(spark, DetectionConfig())
@@ -254,11 +237,11 @@ Add documentation for the new method in the appropriate guide.
 
 ## Release Process
 
-1. Update version in `pyproject.toml` files
+1. Update version in `pyproject.toml`
 2. Update CHANGELOG.md
 3. Create release PR
 4. After merge, tag the release
-5. CI/CD publishes packages
+5. CI/CD deploys automatically
 
 ```bash
 # Tag a release

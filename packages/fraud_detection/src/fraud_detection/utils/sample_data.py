@@ -270,7 +270,10 @@ def generate_sample_claims(
     Creates a pool of providers and patients, then generates claims with a
     controlled proportion of fraudulent records. Fraudulent claims may also
     spawn exact duplicates (with different claim IDs) to simulate duplicate
-    billing fraud.
+    billing fraud (this happens with probability 0.2).
+
+    In total, the output then contains approximately `num_claims * (1 + 0.2 * fraud_rate)`
+    records, including duplicates.
 
     Parameters
     ----------

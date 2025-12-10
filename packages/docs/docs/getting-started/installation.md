@@ -3,9 +3,9 @@
 ## Prerequisites
 
 - [uv](https://docs.astral.sh/uv/) - Fast Python package manager
-- Java 11+ (for PySpark)
+- Java 17+ (for PySpark)
+    - You may need to set `JAVA_HOME` environment variable (e.g. `export JAVA_HOME="/Users/$(whoami)/Library/Java/JavaVirtualMachines/corretto-17.0.9/Contents/Home"`)
 - Node.js 22+ (for CDK)
-- Yarn 4+ (for package management)
 - AWS CLI configured with appropriate credentials (for deployment)
 
 ### Installing uv
@@ -27,8 +27,8 @@ The fastest way to get started:
 
 ```bash
 # Clone the repository
-git clone https://github.com/your-org/insurance-fraud.git
-cd insurance-fraud
+git clone https://github.com/caverac/insurance-fraud-detection.git
+cd insurance-fraud-detection
 
 # Install everything (Python + Node.js + pre-commit hooks)
 make install
@@ -38,7 +38,7 @@ This single command:
 
 1. Creates a virtual environment and installs all Python dependencies via `uv sync`
 2. Installs pre-commit hooks for code quality
-3. Installs Node.js dependencies (including local aws-cdk) via `yarn install`
+3. Installs Node.js dependencies for CDK in `packages/infra`
 
 ## Manual Installation
 
@@ -60,6 +60,7 @@ uv run pre-commit install
 ### 3. Node.js Dependencies (for CDK)
 
 ```bash
+cd packages/infra
 yarn install
 ```
 
@@ -72,11 +73,14 @@ uv run fraud-detect --help
 # Check Spark
 uv run python -c "from pyspark.sql import SparkSession; print('PySpark OK')"
 
-# Check CDK (using local installation)
-yarn cdk --version
+# Check CDK
+cd packages/infra && yarn cdk --version
 
 # Verify pre-commit hooks
 uv run pre-commit run --all-files
+
+# Run tests
+uv run pytest
 ```
 
 ## Common uv Commands
@@ -99,16 +103,33 @@ uv lock --upgrade
 uv sync
 ```
 
-## Docker Setup (Alternative)
+## CDK Commands
 
-A Docker-based setup is available for consistent development environments:
+CDK commands are run from the `packages/infra` directory:
 
 ```bash
-# Build the development image
-docker build -t fraud-detection-dev .
+cd packages/infra
 
-# Run with mounted source
-docker run -it -v $(pwd):/app fraud-detection-dev bash
+# Synthesize CloudFormation templates
+yarn synth
+
+# Deploy all stacks
+yarn deploy
+
+# Show differences
+yarn diff
+
+# Bootstrap (first-time setup)
+yarn bootstrap
+```
+
+Or use make targets from the project root:
+
+```bash
+make cdk-synth
+make cdk-deploy
+make cdk-diff
+make cdk-bootstrap
 ```
 
 ## IDE Configuration
@@ -154,12 +175,12 @@ If you encounter Java-related errors:
 
 ```bash
 # On macOS with Homebrew
-brew install openjdk@11
-export JAVA_HOME=/opt/homebrew/opt/openjdk@11
+brew install openjdk@17
+export JAVA_HOME=/opt/homebrew/opt/openjdk@17
 
 # On Ubuntu
-sudo apt install openjdk-11-jdk
-export JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64
+sudo apt install openjdk-17-jdk
+export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
 ```
 
 ### CDK Bootstrap
@@ -167,8 +188,9 @@ export JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64
 First-time CDK deployment requires bootstrapping:
 
 ```bash
-make cdk-bootstrap
-# Or manually: yarn cdk bootstrap aws://ACCOUNT_ID/REGION
+cd packages/infra
+yarn bootstrap
+# Or: yarn cdk bootstrap aws://ACCOUNT_ID/REGION
 ```
 
 ### Permission Issues
