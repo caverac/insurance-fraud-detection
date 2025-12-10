@@ -17,7 +17,7 @@ help:
 install:
 	uv sync
 	uv run pre-commit install
-	yarn install
+	cd packages/infra && yarn install
 
 # Testing (requires Java 17 for PySpark compatibility)
 test:
@@ -65,18 +65,18 @@ run-local:
 analyze:
 	uv run fraud-detect analyze --results /tmp/results --report summary
 
-# CDK commands (using local yarn)
+# CDK commands
 cdk-synth:
-	yarn cdk:synth
+	cd packages/infra && yarn synth
 
 cdk-deploy:
-	yarn cdk:deploy
+	cd packages/infra && yarn deploy
 
 cdk-destroy:
-	yarn cdk:destroy
+	cd packages/infra && yarn destroy
 
 cdk-diff:
-	yarn cdk:diff
+	cd packages/infra && yarn diff
 
 cdk-bootstrap:
-	yarn cdk:bootstrap
+	cd packages/infra && yarn bootstrap

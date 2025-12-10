@@ -1,0 +1,17 @@
+{
+  "name": "infra",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "cdk": "cdk",
+    "synth": "cdk synth",
+    "deploy": "cdk deploy --all",
+    "destroy": "cdk destroy --all",
+    "diff": "cdk diff",
+    "bootstrap": "cdk bootstrap"
+  },
+  "devDependencies": {
+    "aws-cdk": "^2.170.0"
+  },
+  "packageManager": "yarn@4.12.0"
+}
