@@ -33,35 +33,23 @@ results.write.parquet("./results")
 
 ## AWS EMR Execution
 
-### Spark Submit
+The recommended way to run jobs on AWS is through the **event-driven pipeline** - simply upload files to S3 and the pipeline triggers automatically. See [Running in AWS](#running-in-aws) for details.
+
+### Manual Spark Submit (Advanced)
+
+If you need to manually run spark-submit on an EMR cluster (e.g., for debugging), SSH into the EMR master node and run:
 
 ```bash
+# SSH into EMR master node first
 spark-submit \
     --deploy-mode cluster \
     --master yarn \
-    --num-executors 10 \
-    --executor-memory 4g \
-    --executor-cores 2 \
-    s3://bucket/scripts/fraud_detection.py \
-    --input s3://bucket/claims/ \
-    --output s3://bucket/results/
+    s3://fraud-detection-scripts-ACCOUNT-REGION/jobs/run_fraud_detection.py \
+    --input s3://fraud-detection-data-ACCOUNT-REGION/claims/your-file.csv \
+    --output s3://fraud-detection-results-ACCOUNT-REGION/flagged/
 ```
 
-### Step Functions Pipeline
-
-The CDK infrastructure includes a Step Functions state machine that:
-
-1. Creates an EMR cluster
-2. Runs the fraud detection job
-3. Terminates the cluster
-
-**Trigger via AWS Console or CLI**:
-
-```bash
-aws stepfunctions start-execution \
-    --state-machine-arn arn:aws:states:us-east-1:123456789:stateMachine:fraud-detection-pipeline \
-    --input '{}'
-```
+Note: Replace `ACCOUNT` and `REGION` with your AWS account ID and region. This approach is not recommended for production - use the S3 trigger instead.
 
 ## Job Configuration
 
@@ -105,50 +93,6 @@ Run with spark-submit:
 spark-submit --deploy-mode cluster custom_job.py
 ```
 
-## Scheduling
-
-### AWS EventBridge
-
-Schedule daily runs using EventBridge:
-
-```python
-# In CDK
-events.Rule(
-    self,
-    "DailyFraudDetection",
-    schedule=events.Schedule.cron(hour="2", minute="0"),
-    targets=[
-        targets.SfnStateMachine(state_machine)
-    ],
-)
-```
-
-### Airflow DAG
-
-```python
-from airflow import DAG
-from airflow.providers.amazon.aws.operators.emr import EmrAddStepsOperator
-
-with DAG("fraud_detection", schedule_interval="@daily") as dag:
-    detect_fraud = EmrAddStepsOperator(
-        task_id="detect_fraud",
-        job_flow_id="{{ var.value.emr_cluster_id }}",
-        steps=[{
-            "Name": "Fraud Detection",
-            "ActionOnFailure": "CONTINUE",
-            "HadoopJarStep": {
-                "Jar": "command-runner.jar",
-                "Args": [
-                    "spark-submit",
-                    "s3://bucket/scripts/fraud_detection.py",
-                    "--input", "s3://bucket/claims/",
-                    "--output", "s3://bucket/results/{{ ds }}/",
-                ]
-            }
-        }]
-    )
-```
-
 ## Monitoring
 
 ### Job Metrics
@@ -165,64 +109,6 @@ INFO: High risk (score > 0.7): 3,456
 INFO: Duplicates detected: 12,345
 INFO: Writing results to s3://bucket/results/
 INFO: Fraud detection job completed successfully
-```
-
-### CloudWatch Metrics
-
-When running on EMR, metrics are sent to CloudWatch:
-
-- `ClaimsProcessed`
-- `FlaggedClaims`
-- `HighRiskClaims`
-- `DuplicatesDetected`
-- `ProcessingTimeSeconds`
-
-### Alerting
-
-Set up CloudWatch alarms:
-
-```python
-# Alert if high-risk claims exceed threshold
-cloudwatch.Alarm(
-    self,
-    "HighRiskAlert",
-    metric=cloudwatch.Metric(
-        namespace="FraudDetection",
-        metric_name="HighRiskClaims",
-    ),
-    threshold=1000,
-    evaluation_periods=1,
-    alarm_actions=[sns_topic],
-)
-```
-
-## Error Handling
-
-### Retries
-
-The Step Functions workflow includes retry logic:
-
-```python
-tasks.EmrAddStep(
-    # ...
-    result_path="$.step_result",
-).add_retry(
-    errors=["States.TaskFailed"],
-    max_attempts=2,
-    backoff_rate=2,
-)
-```
-
-### Failure Notifications
-
-Failed jobs trigger SNS notifications:
-
-```bash
-# Subscribe to failure notifications
-aws sns subscribe \
-    --topic-arn arn:aws:sns:us-east-1:123456789:fraud-detection-alerts \
-    --protocol email \
-    --notification-endpoint your@email.com
 ```
 
 ## Performance Tuning
@@ -269,7 +155,11 @@ result2 = analyzer.analyze(claims)
 
 Before running jobs in AWS, you must deploy the infrastructure. See [Deploy All Stacks](../architecture/aws.md#deploy-all-stacks) for deployment instructions.
 
-### 1. Upload Sample Data to S3
+### Event-Driven Processing
+
+The pipeline is **event-driven** - it automatically triggers when you upload files to the S3 data bucket. When a file is uploaded to the `claims/` prefix, an EventBridge rule triggers the Step Functions pipeline to process that specific file.
+
+### 1. Upload Claims Data to S3
 
 ```bash
 # Generate sample data locally
@@ -281,26 +171,38 @@ DATA_BUCKET=$(aws ssm get-parameter \
     --query "Parameter.Value" \
     --output text)
 
-# Upload to S3
-aws s3 cp /tmp/sample_data/ s3://$DATA_BUCKET/claims/ --recursive
+# Upload to S3 - this automatically triggers the pipeline!
+aws s3 cp /tmp/sample_data/claims.csv s3://$DATA_BUCKET/claims/
 ```
 
-### 2. Run the Step Functions Pipeline
+The pipeline will automatically start processing the uploaded file. Each file upload triggers a separate pipeline execution.
+
+### 2. Monitor Pipeline Execution
+
+Monitor progress in the AWS Console: **Step Functions → State Machines → fraud-detection-pipeline**
+
+Or check running executions via CLI:
 
 ```bash
-# Get the state machine ARN from SSM
 STATE_MACHINE_ARN=$(aws ssm get-parameter \
     --name "/fraud-detection/state-machine-arn" \
     --query "Parameter.Value" \
     --output text)
 
-# Start execution
-aws stepfunctions start-execution \
+# List recent executions
+aws stepfunctions list-executions \
     --state-machine-arn $STATE_MACHINE_ARN \
-    --input '{}'
+    --max-results 5
 ```
 
-Monitor progress in the AWS Console: **Step Functions → State Machines → fraud-detection-pipeline**
+### Pipeline Flow
+
+1. **S3 Upload** - File uploaded to `s3://{data-bucket}/claims/`
+2. **EventBridge** - Detects S3 Object Created event
+3. **Step Functions** - Starts pipeline execution with file path
+4. **EMR Cluster** - Spins up (~5-10 min), runs fraud detection
+5. **Results** - Written to `s3://{results-bucket}/flagged/`
+6. **Cleanup** - EMR cluster terminates automatically
 
 ### 3. Query Results with Athena
 
@@ -319,9 +221,10 @@ aws s3 ls s3://$RESULTS_BUCKET/flagged/
 
 In the AWS Console:
 
-1. Go to **Athena**
-2. Select workgroup: `fraud-detection-workgroup`
-3. Run the saved queries:
+1. Go to **Athena** → **Query editor**
+2. Select workgroup: `fraud-detection-workgroup` (dropdown in top right)
+3. Go to the **Saved queries** tab
+4. Run one of the pre-built queries:
     - **High Risk Providers** - Providers with highest fraud scores
     - **Duplicate Claims** - All detected duplicates
     - **Fraud by Rule Type** - Breakdown by rule violations
@@ -360,3 +263,69 @@ All stack outputs are stored in SSM Parameter Store under the `/fraud-detection/
 | `/fraud-detection/state-machine-arn` | Step Functions state machine ARN |
 | `/fraud-detection/athena-workgroup` | Athena workgroup name |
 | `/fraud-detection/query-results-bucket` | Athena query results bucket |
+
+## Troubleshooting
+
+### Athena Queries Return No Results
+
+The results table is partitioned by `detection_date`. When a new day's data is written, Athena won't see it until the partition is registered.
+
+**Solution:** Run this in Athena to discover new partitions:
+
+```sql
+MSCK REPAIR TABLE fraud_detection_db.flagged_claims;
+```
+
+### Athena Schema Mismatch Error
+
+If you see errors like `Field X's type Y is incompatible with type Z defined in table schema`, the partition metadata may be stale.
+
+**Solution:** Drop and re-add the partition:
+
+```sql
+-- Drop the partition with stale schema
+ALTER TABLE fraud_detection_db.flagged_claims
+DROP PARTITION (detection_date='2025-12-12');
+
+-- Re-discover with correct schema
+MSCK REPAIR TABLE fraud_detection_db.flagged_claims;
+```
+
+### Step Functions Execution Failed
+
+Check the execution details in the AWS Console:
+
+1. Go to **Step Functions** → **State machines** → `fraud-detection-pipeline`
+2. Click on the failed execution
+3. Check which step failed and view the error message
+
+For EMR step failures, check the logs:
+
+```bash
+LOGS_BUCKET=$(aws ssm get-parameter \
+    --name "/fraud-detection/logs-bucket" \
+    --query "Parameter.Value" \
+    --output text)
+
+# List recent cluster logs
+aws s3 ls s3://$LOGS_BUCKET/emr-logs/ --recursive | tail -20
+
+# View step stderr (replace CLUSTER_ID and STEP_ID)
+aws s3 cp s3://$LOGS_BUCKET/emr-logs/CLUSTER_ID/steps/STEP_ID/stderr.gz - | gunzip
+```
+
+### Pipeline Not Triggering on S3 Upload
+
+Verify the file is uploaded to the correct prefix:
+
+```bash
+# Must be under claims/ prefix
+aws s3 cp data.csv s3://$DATA_BUCKET/claims/data.csv  # Triggers pipeline
+aws s3 cp data.csv s3://$DATA_BUCKET/other/data.csv   # Does NOT trigger
+```
+
+Check EventBridge rule exists:
+
+```bash
+aws events list-rules --query "Rules[?contains(Name, 'fraud-detection')]"
+```

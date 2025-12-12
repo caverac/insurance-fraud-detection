@@ -43,7 +43,7 @@ class TestDuplicateDetector:
         result = detector.detect(claims)
 
         # One of the duplicates should be flagged
-        duplicates = result.filter(result.is_duplicate == True).collect()  # noqa: E712
+        duplicates = result.filter(result.is_duplicate).collect()
 
         assert len(duplicates) == 1
         assert duplicates[0]["claim_id"] == "CLM002"  # Second claim is the duplicate
@@ -69,7 +69,7 @@ class TestDuplicateDetector:
         result = detector.detect(claims)
 
         # Check if near-duplicate is detected
-        near_dupes = result.filter((result.is_duplicate == True) & (result.claim_id == "CLM002")).collect()  # noqa: E712
+        near_dupes = result.filter((result.is_duplicate) & (result.claim_id == "CLM002")).collect()
 
         # Near duplicate should be detected
         assert len(near_dupes) == 1
@@ -91,7 +91,7 @@ class TestDuplicateDetector:
 
         result = detector.detect(claims)
 
-        duplicates = result.filter(result.is_duplicate == True).count()  # noqa: E712
+        duplicates = result.filter(result.is_duplicate).count()
 
         assert duplicates == 0
 
@@ -119,7 +119,7 @@ class TestDuplicateDetector:
         result = detector.detect(claims)
 
         # Should detect 3 duplicates (2 from first group, 1 from second)
-        duplicates = result.filter(result.is_duplicate == True).count()  # noqa: E712
+        duplicates = result.filter(result.is_duplicate).count()
 
         assert duplicates == 3
 
@@ -140,7 +140,7 @@ class TestDuplicateDetector:
 
         result = detector.detect(claims)
 
-        duplicates = result.filter(result.is_duplicate == True).count()  # noqa: E712
+        duplicates = result.filter(result.is_duplicate).count()
 
         # Should not be flagged as duplicates (outside time window)
         assert duplicates == 0

@@ -307,6 +307,7 @@ class TestFraudDetector:
         ]
         claims = spark.createDataFrame(data, schema)  # type: ignore[arg-type]
 
+        # pylint: disable=protected-access
         result = detector._apply_rules(claims)  # pyright: ignore[reportPrivateUsage]
 
         # Check that rule columns were added
@@ -344,6 +345,7 @@ class TestFraudDetector:
         ]
         claims = spark.createDataFrame(data, schema)  # type: ignore[arg-type]
 
+        # pylint: disable=protected-access
         result = detector._apply_statistics(claims)  # pyright: ignore[reportPrivateUsage]
 
         # Check that statistical columns were added
@@ -380,6 +382,7 @@ class TestFraudDetector:
         ]
         claims = spark.createDataFrame(data, schema)  # type: ignore[arg-type]
 
+        # pylint: disable=protected-access
         result = detector._detect_duplicates(claims)  # pyright: ignore[reportPrivateUsage]
 
         # Check that duplicate columns were added

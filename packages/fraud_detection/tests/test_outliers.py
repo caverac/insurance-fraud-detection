@@ -43,7 +43,7 @@ class TestOutlierDetector:
 
         result = detector.detect_zscore_outliers(claims, "charge_amount", "is_outlier")
 
-        outliers = result.filter(result.is_outlier == True).collect()  # noqa: E712
+        outliers = result.filter(result.is_outlier).collect()
 
         # The $5000 claim should be detected as an outlier
         assert len(outliers) == 1
@@ -70,7 +70,7 @@ class TestOutlierDetector:
 
         result = detector.detect_iqr_outliers(claims, "charge_amount", "is_outlier")
 
-        outliers = result.filter(result.is_outlier == True).collect()  # noqa: E712
+        outliers = result.filter(result.is_outlier).collect()
         outlier_ids = {r["claim_id"] for r in outliers}
 
         # Both low and high outliers should be detected
@@ -105,7 +105,7 @@ class TestOutlierDetector:
 
         result = detector.detect_zscore_outliers(claims, "charge_amount", "is_outlier", group_by=["procedure_code"])
 
-        outliers = result.filter(result.is_outlier == True).collect()  # noqa: E712
+        outliers = result.filter(result.is_outlier).collect()
 
         # Only CLM004 should be an outlier (500 is outlier for 99213, not for 99215)
         assert len(outliers) == 1
@@ -129,7 +129,7 @@ class TestOutlierDetector:
 
         result = detector.detect_zscore_outliers(claims, "charge_amount", "is_outlier")
 
-        outliers = result.filter(result.is_outlier == True).count()  # noqa: E712
+        outliers = result.filter(result.is_outlier).count()
 
         # No outliers in perfectly uniform data
         assert outliers == 0
@@ -187,7 +187,7 @@ class TestOutlierDetector:
         assert "procedure_charge_outlier" in result.columns
 
         # The $500 claim for 99213 should be an outlier
-        outliers = result.filter(result.procedure_charge_outlier == True).collect()  # noqa: E712
+        outliers = result.filter(result.procedure_charge_outlier).collect()
         assert len(outliers) == 1
         assert outliers[0]["claim_id"] == "CLM004"
 
@@ -288,7 +288,7 @@ class TestOutlierDetector:
         result = detector.detect_temporal_outliers(claims)
 
         # No spikes should be detected
-        spikes = result.filter(result.temporal_spike_flag == True).count()  # noqa: E712
+        spikes = result.filter(result.temporal_spike_flag).count()
         assert spikes == 0
 
     def test_provider_outliers_zero_market_avg(

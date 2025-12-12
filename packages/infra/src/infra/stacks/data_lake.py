@@ -35,6 +35,7 @@ class DataLakeStack(cdk.Stack):
             block_public_access=s3.BlockPublicAccess.BLOCK_ALL,
             versioned=True,
             removal_policy=RemovalPolicy.RETAIN,
+            event_bridge_enabled=True,  # Enable EventBridge notifications for S3 events
             lifecycle_rules=[
                 s3.LifecycleRule(
                     id="TransitionToIA",
