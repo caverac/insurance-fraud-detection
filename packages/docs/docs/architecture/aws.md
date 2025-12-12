@@ -149,13 +149,18 @@ cdk bootstrap aws://ACCOUNT_ID/REGION
 ### Deploy All Stacks
 
 ```bash
+# From project root
 make cdk-deploy
-# Or: yarn cdk:deploy
+
+# Or from packages/infra
+cd packages/infra && yarn deploy
 ```
 
 ### Deploy Individual Stacks
 
 ```bash
+# From packages/infra
+cd packages/infra
 yarn cdk deploy fraud-detection-data-lake
 yarn cdk deploy fraud-detection-processing
 yarn cdk deploy fraud-detection-analytics
@@ -164,8 +169,11 @@ yarn cdk deploy fraud-detection-analytics
 ### Destroy Stacks
 
 ```bash
+# From project root
 make cdk-destroy
-# Or: yarn cdk:destroy
+
+# Or from packages/infra
+cd packages/infra && yarn destroy
 ```
 
 ## Cost Optimization

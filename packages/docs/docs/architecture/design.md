@@ -176,11 +176,10 @@ class DetectionConfig:
 
 ### Configuration Sources
 
-1. **Defaults**: Hardcoded sensible defaults
-2. **Code**: Override in Python
-3. **CLI**: Command-line arguments
-4. **Environment**: Environment variables
-5. **File**: YAML/JSON configuration files
+1. **Defaults**: Hardcoded sensible defaults in `DetectionConfig`
+2. **Code**: Override in Python when instantiating `DetectionConfig`
+
+For custom thresholds in production, create a custom job script that instantiates `DetectionConfig` with your desired values.
 
 ## Error Handling
 

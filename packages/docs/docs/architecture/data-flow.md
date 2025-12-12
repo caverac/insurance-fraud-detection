@@ -3,7 +3,7 @@
 ## End-to-End Pipeline
 
 ```mermaid
-graph LR
+graph TB
     subgraph Sources
         A[CMS Data]
         B[Provider Data]

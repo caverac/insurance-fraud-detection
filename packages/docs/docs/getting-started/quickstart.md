@@ -62,7 +62,7 @@ INFO:fraud_detection.cli:Score Distribution
 Identify providers with the most suspicious patterns:
 
 ```bash
-fraud-detect analyze --results ./results --report providers
+uv run fraud-detect analyze --results ./results --report providers
 ```
 
 ## Using Python API
