@@ -8,6 +8,13 @@ The fraud detection system is deployed on AWS using CDK infrastructure as code.
 
 ```mermaid
 flowchart TB
+    Upload[File Upload] --> S3Data
+
+    subgraph EventDriven[Event-Driven Pipeline]
+        S3Data[(S3 Data<br/>Bucket)] --> EventBridge[EventBridge]
+        EventBridge --> StepFunctions[Step Functions]
+    end
+
     subgraph VPC[VPC]
         subgraph Private[Private Subnets]
             subgraph EMR[EMR Cluster]
@@ -22,7 +29,6 @@ flowchart TB
     end
 
     subgraph Storage[S3 Buckets]
-        S3Data[(S3 Data<br/>Bucket)]
         S3Results[(S3 Results<br/>Bucket)]
         S3Scripts[(S3 Scripts<br/>Bucket)]
     end
@@ -35,6 +41,7 @@ flowchart TB
         Athena[Athena]
     end
 
+    StepFunctions --> EMR
     Private --> NAT
     NAT --> Internet((Internet))
 
@@ -51,7 +58,7 @@ flowchart TB
 
 **Resources**:
 
-- S3 bucket for raw claims data
+- S3 bucket for raw claims data (EventBridge notifications enabled)
 - S3 bucket for processed results
 - Glue database for metadata
 - Glue crawlers for schema discovery
@@ -84,6 +91,7 @@ self.data_bucket = s3.Bucket(
 - EMR security groups
 - IAM roles for EMR
 - Step Functions state machine
+- EventBridge rule (S3 trigger)
 - Scripts bucket for Spark jobs
 
 **EMR Configuration**:
@@ -124,14 +132,39 @@ instances=tasks.EmrCreateCluster.InstancesConfigProperty(
 
 ## Step Functions Pipeline
 
+The pipeline is triggered automatically when files are uploaded to the `claims/` prefix in the data bucket.
+
 ```mermaid
 stateDiagram-v2
-    [*] --> CreateCluster
+    [*] --> TransformInput: S3 Event
+    TransformInput --> CreateCluster
     CreateCluster --> RunFraudDetection
     RunFraudDetection --> TerminateCluster
     TerminateCluster --> [*]
 
     RunFraudDetection --> TerminateCluster: on failure
+```
+
+**Pipeline States**:
+
+1. **TransformInput** - Extracts S3 bucket and key from EventBridge event
+2. **CreateCluster** - Spins up EMR cluster with Python 3.13 bootstrap
+3. **RunFraudDetection** - Submits Spark job with dynamic input path
+4. **TerminateCluster** - Cleans up EMR resources
+
+**EventBridge Rule**:
+
+```python
+events.Rule(
+    event_pattern=events.EventPattern(
+        source=["aws.s3"],
+        detail_type=["Object Created"],
+        detail={
+            "bucket": {"name": events.Match.exact_string(data_bucket.bucket_name)},
+            "object": {"key": events.Match.prefix("claims/")},
+        },
+    ),
+)
 ```
 
 ## Deployment

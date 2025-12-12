@@ -2,6 +2,8 @@
 
 ## End-to-End Pipeline
 
+The pipeline is **event-driven** - uploading a file to S3 automatically triggers processing.
+
 ```mermaid
 graph TB
     subgraph Sources
@@ -12,6 +14,11 @@ graph TB
 
     subgraph Ingestion
         D[S3 Raw Zone]
+    end
+
+    subgraph EventTrigger[Event Trigger]
+        EB[EventBridge]
+        SF[Step Functions]
     end
 
     subgraph Processing
@@ -32,13 +39,24 @@ graph TB
     A --> D
     B --> D
     C --> D
-    D --> E
+    D --> EB
+    EB --> SF
+    SF --> E
     E --> F
     F --> G
     G --> H
     H --> I
     I --> J
 ```
+
+**Trigger Flow**:
+
+1. File uploaded to `s3://{data-bucket}/claims/`
+2. S3 sends event to EventBridge
+3. EventBridge rule matches `Object Created` events with `claims/` prefix
+4. Step Functions pipeline starts with file path as input
+5. EMR cluster processes the specific file
+6. Results written to results bucket
 
 ## Data Zones
 

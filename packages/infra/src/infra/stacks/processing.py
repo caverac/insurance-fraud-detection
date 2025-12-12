@@ -6,6 +6,8 @@ import tempfile
 
 import aws_cdk as cdk
 from aws_cdk import aws_ec2 as ec2
+from aws_cdk import aws_events as events
+from aws_cdk import aws_events_targets as targets_events
 from aws_cdk import aws_iam as iam
 from aws_cdk import aws_s3 as s3
 from aws_cdk import aws_s3_deployment as s3_deploy
@@ -320,29 +322,21 @@ class ProcessingStack(cdk.Stack):
                 ),
             ],
             integration_pattern=sfn.IntegrationPattern.RUN_JOB,
+            result_path="$.Cluster",
         )
 
         # Add fraud detection step
         # Use result_path to store step output separately, preserving ClusterId for terminate step
+        # Input path comes from EventBridge event via $.InputPath
+        # Use args_as_json_path to enable dynamic values from state input
         fraud_detection_step = tasks.EmrAddStep(
             self,
             "RunFraudDetection",
-            cluster_id=sfn.JsonPath.string_at("$.ClusterId"),
+            cluster_id=sfn.JsonPath.string_at("$.Cluster.ClusterId"),
             name="FraudDetectionJob",
             action_on_failure=tasks.ActionOnFailure.CONTINUE,
             jar="command-runner.jar",
-            args=[
-                "spark-submit",
-                "--deploy-mode",
-                "cluster",
-                "--class",
-                "org.apache.spark.deploy.SparkSubmit",
-                f"s3://{scripts_bucket.bucket_name}/jobs/run_fraud_detection.py",
-                "--input",
-                f"s3://{data_bucket.bucket_name}/claims/",
-                "--output",
-                f"s3://{results_bucket.bucket_name}/flagged/",
-            ],
+            args=sfn.JsonPath.list_at("$.SparkArgs"),
             integration_pattern=sfn.IntegrationPattern.RUN_JOB,
             result_path="$.StepResult",
         )
@@ -351,12 +345,43 @@ class ProcessingStack(cdk.Stack):
         terminate_cluster = tasks.EmrTerminateCluster(
             self,
             "TerminateCluster",
-            cluster_id=sfn.JsonPath.string_at("$.ClusterId"),
+            cluster_id=sfn.JsonPath.string_at("$.Cluster.ClusterId"),
             integration_pattern=sfn.IntegrationPattern.RUN_JOB,
         )
 
-        # Define state machine
-        definition = create_cluster.next(fraud_detection_step).next(terminate_cluster)
+        # Pass state to transform EventBridge input into the format we need
+        # EventBridge S3 event has: detail.bucket.name and detail.object.key
+        # We build the SparkArgs array that will be used by EmrAddStep
+        transform_input = sfn.Pass(
+            self,
+            "TransformInput",
+            parameters={
+                "InputPath": sfn.JsonPath.format(
+                    "s3://{}/{}",
+                    sfn.JsonPath.string_at("$.detail.bucket.name"),
+                    sfn.JsonPath.string_at("$.detail.object.key"),
+                ),
+                "SparkArgs": sfn.JsonPath.array(
+                    "spark-submit",
+                    "--deploy-mode",
+                    "cluster",
+                    "--class",
+                    "org.apache.spark.deploy.SparkSubmit",
+                    f"s3://{scripts_bucket.bucket_name}/jobs/run_fraud_detection.py",
+                    "--input",
+                    sfn.JsonPath.format(
+                        "s3://{}/{}",
+                        sfn.JsonPath.string_at("$.detail.bucket.name"),
+                        sfn.JsonPath.string_at("$.detail.object.key"),
+                    ),
+                    "--output",
+                    f"s3://{results_bucket.bucket_name}/flagged/",
+                ),
+            },
+        )
+
+        # Define state machine with input transformation
+        definition = transform_input.next(create_cluster).next(fraud_detection_step).next(terminate_cluster)
 
         self.state_machine = sfn.StateMachine(
             self,
@@ -365,6 +390,31 @@ class ProcessingStack(cdk.Stack):
             definition_body=sfn.DefinitionBody.from_chainable(definition),
             role=sfn_role,  # type: ignore[arg-type]
             timeout=cdk.Duration.hours(2),
+        )
+
+        # EventBridge rule to trigger Step Functions on S3 object creation
+        # Only triggers for files in the claims/ prefix
+        s3_event_rule = events.Rule(
+            self,
+            "S3ObjectCreatedRule",
+            rule_name=f"{project_name}-s3-trigger",
+            description="Triggers fraud detection pipeline when new claims data is uploaded",
+            event_pattern=events.EventPattern(
+                source=["aws.s3"],
+                detail_type=["Object Created"],
+                detail={
+                    "bucket": {"name": events.Match.exact_string(data_bucket.bucket_name)},
+                    "object": {"key": events.Match.prefix("claims/")},
+                },
+            ),
+        )
+
+        # Add Step Functions as target for the EventBridge rule
+        s3_event_rule.add_target(
+            targets_events.SfnStateMachine(
+                self.state_machine,
+                input=events.RuleTargetInput.from_event_path("$"),
+            )
         )
 
         # Store SSM parameters

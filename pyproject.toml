@@ -65,8 +65,8 @@ known_first_party = ["fraud_detection", "infra", "docs"]
 [tool.pylint.main]
 py-version = "3.13"
 jobs = 0
-ignore-paths = [".*/__pycache__/.*", ".*/tests/.*", "packages/docs/.*"]
-ignore-patterns = ["test_.*\\.py", "conftest\\.py"]
+ignore = ["node_modules", "cdk.out"]
+ignore-paths = [".*/__pycache__/.*", "packages/docs/.*"]
 
 [tool.pylint.format]
 max-line-length = 150
@@ -85,6 +85,7 @@ max-args = 10
 [tool.pydocstyle]
 convention = "numpy"
 add-ignore = ["D100", "D104", "D105"]
+match-dir = "(?!node_modules|cdk\\.out).*"
 
 [tool.mypy]
 python_version = "3.13"

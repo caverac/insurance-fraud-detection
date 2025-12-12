@@ -3,8 +3,10 @@
 import argparse
 import logging
 import sys
+from datetime import date
 
 from pyspark.sql import SparkSession
+from pyspark.sql import functions as F
 
 from fraud_detection import FraudDetector
 
@@ -52,8 +54,12 @@ def main() -> int:
         high_risk = results.filter(results.fraud_score > 0.7).count()
         logger.info("Flagged claims: %d, High risk (>0.7): %d", flagged_count, high_risk)
 
-        logger.info("Writing results to %s", args.output)
-        results.write.mode("overwrite").parquet(args.output)
+        # Add detection_date partition column
+        today = date.today().isoformat()
+        results_partitioned = results.withColumn("detection_date", F.lit(today))
+
+        logger.info("Writing results to %s with partition detection_date=%s", args.output, today)
+        results_partitioned.write.mode("overwrite").partitionBy("detection_date").parquet(args.output)
         logger.info("Fraud detection job completed successfully")
 
         return 0

@@ -131,7 +131,7 @@ make cdk-diff
 ## Architecture
 
 ```mermaid
-flowchart LR
+flowchart TB
     subgraph Input
         A[S3 Raw Data<br/>Claims]
     end

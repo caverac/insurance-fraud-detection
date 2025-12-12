@@ -5,7 +5,7 @@ from decimal import Decimal
 
 import pytest
 from pyspark.sql import DataFrame, SparkSession
-from pyspark.sql.types import StructType
+from pyspark.sql.types import StringType, StructField, StructType
 
 from fraud_detection.detector import DetectionConfig
 from fraud_detection.rules.billing_patterns import BillingPatternRules
@@ -103,9 +103,6 @@ class TestBillingPatternRules:
         claims_schema: StructType,
     ) -> None:
         """Test detection of round amount patterns."""
-        from datetime import date
-        from decimal import Decimal
-
         d = Decimal
         data = [
             # Provider with many round amounts (>20% threshold)
@@ -140,12 +137,9 @@ class TestBillingPatternRules:
         claims_schema: StructType,
     ) -> None:
         """Test detection of procedure unbundling."""
-        from pyspark.sql.types import StringType, StructField
-        from pyspark.sql.types import StructType as ST
-
         d = Decimal
         # Create bundled procedures reference table
-        bundled_schema = ST(
+        bundled_schema = StructType(
             [
                 StructField("bundled_code", StringType(), False),
                 StructField("unbundled_code_1", StringType(), False),
@@ -156,7 +150,7 @@ class TestBillingPatternRules:
             ("80053", "80048", "80076"),  # Comprehensive metabolic panel components
             ("85025", "85027", "85004"),  # CBC components
         ]
-        bundled_procedures = spark.createDataFrame(bundled_data, bundled_schema)
+        bundled_procedures = spark.createDataFrame(bundled_data, bundled_schema)  # type: ignore[arg-type]
 
         # Claims data
         data = [
@@ -190,11 +184,9 @@ class TestBillingPatternRules:
         claims_schema: StructType,
     ) -> None:
         """Test unbundling check with no matching unbundled pairs."""
-        from pyspark.sql.types import StringType, StructField
-        from pyspark.sql.types import StructType as ST
 
         d = Decimal
-        bundled_schema = ST(
+        bundled_schema = StructType(
             [
                 StructField("bundled_code", StringType(), False),
                 StructField("unbundled_code_1", StringType(), False),
@@ -204,7 +196,7 @@ class TestBillingPatternRules:
         bundled_data = [
             ("80053", "80048", "80076"),
         ]
-        bundled_procedures = spark.createDataFrame(bundled_data, bundled_schema)
+        bundled_procedures = spark.createDataFrame(bundled_data, bundled_schema)  # type: ignore[arg-type]
 
         # Claims without unbundling
         data = [
