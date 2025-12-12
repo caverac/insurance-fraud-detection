@@ -1,6 +1,6 @@
 site_name: Insurance Fraud Detection
 site_description: PySpark-based fraud detection system for insurance claims
-repo_url: https://github.com/caveraio/insurance-fraud-detection
+repo_url: https://github.com/caverac/insurance-fraud-detection
 repo_name: insurance-fraud-detection
 
 theme:
@@ -94,4 +94,4 @@ nav:
 extra:
   social:
     - icon: fontawesome/brands/github
-      link: https://github.com/caveraio/insurance-fraud-detection
+      link: https://github.com/caverac/insurance-fraud-detection

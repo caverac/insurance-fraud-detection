@@ -6,7 +6,7 @@
 2. Install dependencies with uv
 
 ```bash
-git clone https://github.com/caveraio/insurance-fraud-detection.git
+git clone https://github.com/caverac/insurance-fraud-detection.git
 cd insurance-fraud-detection
 
 # Install all dependencies (Python + Node.js + pre-commit hooks)
