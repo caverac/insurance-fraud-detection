@@ -101,7 +101,7 @@ exclude = [
 [tool.pytest.ini_options]
 testpaths = ["packages/fraud_detection/tests", "packages/infra/tests"]
 pythonpath = ["."]
-addopts = "-v --cov=packages --cov-report=term-missing --cov-fail-under=100"
+addopts = "-v --cov=packages/fraud_detection/src/fraud_detection --cov=packages/infra/src/infra --cov-report=term-missing --cov-fail-under=100"
 
 [tool.coverage.run]
 omit = [
@@ -110,7 +110,7 @@ omit = [
     "*/cli.py",
     "*/jobs/*",
     "*/utils/*",
-    "packages/infra/src/*",
+    "*/app.py",
     "packages/docs/*",
 ]
 

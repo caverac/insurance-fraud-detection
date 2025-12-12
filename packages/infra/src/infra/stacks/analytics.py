@@ -4,11 +4,22 @@ import aws_cdk as cdk
 from aws_cdk import aws_athena as athena
 from aws_cdk import aws_glue as glue
 from aws_cdk import aws_s3 as s3
+from aws_cdk import aws_ssm as ssm
 from constructs import Construct
+
+from infra.stacks.queries import (
+    DUPLICATE_CLAIMS_QUERY,
+    FRAUD_BY_RULE_QUERY,
+    HIGH_RISK_PROVIDERS_QUERY,
+)
 
 
 class AnalyticsStack(cdk.Stack):
     """Stack for analytics resources including Athena."""
+
+    project_name: str
+    athena_workgroup: athena.CfnWorkGroup
+    query_results_bucket: s3.Bucket
 
     def __init__(
         self,
@@ -22,6 +33,8 @@ class AnalyticsStack(cdk.Stack):
         **kwargs: object,
     ) -> None:
         super().__init__(scope, construct_id, **kwargs)  # type: ignore[arg-type]
+
+        self.project_name = project_name
 
         # Athena query results bucket
         query_results_bucket = s3.Bucket(
@@ -38,6 +51,7 @@ class AnalyticsStack(cdk.Stack):
                 )
             ],
         )
+        self.query_results_bucket = query_results_bucket
 
         # Athena workgroup
         workgroup = athena.CfnWorkGroup(
@@ -58,6 +72,7 @@ class AnalyticsStack(cdk.Stack):
                 bytes_scanned_cutoff_per_query=10737418240,  # 10 GB limit
             ),
         )
+        self.athena_workgroup = workgroup
 
         # Glue table for raw claims
         glue.CfnTable(
@@ -145,76 +160,54 @@ class AnalyticsStack(cdk.Stack):
         )
 
         # Named queries for common fraud analysis
-        athena.CfnNamedQuery(
+        high_risk_query = athena.CfnNamedQuery(
             self,
             "HighRiskProvidersQuery",
             database=glue_database.ref,
             work_group=workgroup.name,
             name="High Risk Providers",
             description="Find providers with highest fraud scores",
-            query_string=f"""
-SELECT
-    provider_id,
-    COUNT(*) as flagged_claims,
-    AVG(fraud_score) as avg_fraud_score,
-    SUM(charge_amount) as total_charges
-FROM {glue_database.ref}.flagged_claims
-WHERE fraud_score > 0.7
-GROUP BY provider_id
-ORDER BY avg_fraud_score DESC
-LIMIT 100
-""",
+            query_string=HIGH_RISK_PROVIDERS_QUERY.format(database=glue_database.ref),
         )
+        high_risk_query.add_dependency(workgroup)
 
-        athena.CfnNamedQuery(
+        duplicate_query = athena.CfnNamedQuery(
             self,
             "DuplicateClaimsQuery",
             database=glue_database.ref,
             work_group=workgroup.name,
             name="Duplicate Claims",
             description="Find all duplicate claims",
-            query_string=f"""
-SELECT
-    claim_id,
-    duplicate_of,
-    charge_amount,
-    processed_at
-FROM {glue_database.ref}.flagged_claims
-WHERE is_duplicate = true
-ORDER BY processed_at DESC
-""",
+            query_string=DUPLICATE_CLAIMS_QUERY.format(database=glue_database.ref),
         )
+        duplicate_query.add_dependency(workgroup)
 
-        athena.CfnNamedQuery(
+        fraud_by_rule_query = athena.CfnNamedQuery(
             self,
             "FraudByRuleQuery",
             database=glue_database.ref,
             work_group=workgroup.name,
             name="Fraud by Rule Type",
             description="Breakdown of fraud flags by rule type",
-            query_string=f"""
-SELECT
-    rule,
-    COUNT(*) as count,
-    SUM(charge_amount) as total_amount
-FROM {glue_database.ref}.flagged_claims
-CROSS JOIN UNNEST(rule_violations) AS t(rule)
-GROUP BY rule
-ORDER BY count DESC
-""",
+            query_string=FRAUD_BY_RULE_QUERY.format(database=glue_database.ref),
+        )
+        fraud_by_rule_query.add_dependency(workgroup)
+
+        # Store SSM parameters
+        self.store_ssm_parameters()
+
+    def store_ssm_parameters(self) -> None:
+        """Store SSM parameters for later use."""
+        ssm.StringParameter(
+            self,
+            "AthenaWorkgroupNameSSM",
+            parameter_name=f"/{self.project_name}/athena-workgroup",
+            string_value=self.athena_workgroup.name,
         )
 
-        # Outputs
-        cdk.CfnOutput(
+        ssm.StringParameter(
             self,
-            "AthenaWorkgroupName",
-            value=workgroup.name or "",
-            export_name=f"{project_name}-athena-workgroup",
-        )
-
-        cdk.CfnOutput(
-            self,
-            "QueryResultsBucketName",
-            value=query_results_bucket.bucket_name,
-            export_name=f"{project_name}-query-results-bucket",
+            "QueryResultsBucketNameSSM",
+            parameter_name=f"/{self.project_name}/query-results-bucket",
+            string_value=self.query_results_bucket.bucket_name,
         )

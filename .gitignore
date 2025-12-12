@@ -115,6 +115,7 @@ derby.log
 
 # Jupyter
 .ipynb_checkpoints/
+notebooks/
 
 # Local development
 .local/

@@ -1,1 +1,1 @@
-"""Spark job entry points."""
+"""EMR Spark jobs for fraud detection."""

@@ -5,11 +5,14 @@ from aws_cdk import RemovalPolicy
 from aws_cdk import aws_glue as glue
 from aws_cdk import aws_iam as iam
 from aws_cdk import aws_s3 as s3
+from aws_cdk import aws_ssm as ssm
 from constructs import Construct
 
 
 class DataLakeStack(cdk.Stack):
     """Stack for data lake resources including S3 and Glue."""
+
+    project_name: str
 
     def __init__(
         self,
@@ -20,6 +23,8 @@ class DataLakeStack(cdk.Stack):
         **kwargs: object,
     ) -> None:
         super().__init__(scope, construct_id, **kwargs)  # type: ignore[arg-type]
+
+        self.project_name = project_name
 
         # Raw data bucket for incoming claims
         self.data_bucket = s3.Bucket(
@@ -120,24 +125,28 @@ class DataLakeStack(cdk.Stack):
             ),
         )
 
-        # Outputs
-        cdk.CfnOutput(
+        # Store SSM parameters for data lake resources
+        self.store_ssm_parameters()
+
+    def store_ssm_parameters(self) -> None:
+        """Store SSM parameters for data lake resources."""
+        ssm.StringParameter(
             self,
-            "DataBucketName",
-            value=self.data_bucket.bucket_name,
-            export_name=f"{project_name}-data-bucket",
+            "DataBucketNameSSM",
+            parameter_name=f"/{self.project_name}/data-bucket",
+            string_value=self.data_bucket.bucket_name,
         )
 
-        cdk.CfnOutput(
+        ssm.StringParameter(
             self,
-            "ResultsBucketName",
-            value=self.results_bucket.bucket_name,
-            export_name=f"{project_name}-results-bucket",
+            "ResultsBucketNameSSM",
+            parameter_name=f"/{self.project_name}/results-bucket",
+            string_value=self.results_bucket.bucket_name,
         )
 
-        cdk.CfnOutput(
+        ssm.StringParameter(
             self,
-            "GlueDatabaseName",
-            value=self.glue_database.ref,
-            export_name=f"{project_name}-glue-database",
+            "GlueDatabaseNameSSM",
+            parameter_name=f"/{self.project_name}/glue-database",
+            string_value=self.glue_database.ref,
         )
