@@ -209,6 +209,60 @@ make cdk-destroy
 cd packages/infra && yarn destroy
 ```
 
+#### Troubleshooting Stack Deletion
+
+Stack deletion may fail due to:
+
+1. **Athena workgroup not empty** - Contains saved queries or query history
+2. **EMR security groups with circular dependencies** - Security groups reference each other
+3. **Running EMR clusters or Step Functions executions**
+
+If `yarn destroy` fails, run the cleanup script first:
+
+```bash
+# Run cleanup script to remove problematic resources
+./packages/infra/scripts/cleanup.sh
+
+# Then retry destroy
+cd packages/infra && yarn cdk destroy --all
+```
+
+The cleanup script will:
+
+- Delete the Athena workgroup with `--recursive-delete-option`
+- Revoke circular security group rules and delete EMR security groups
+- Terminate any running EMR clusters
+- Stop any running Step Functions executions
+
+#### Manual Cleanup (if script fails)
+
+If the cleanup script doesn't resolve the issue:
+
+```bash
+# 1. Delete Athena workgroup
+aws athena delete-work-group \
+    --work-group fraud-detection-workgroup \
+    --recursive-delete-option
+
+# 2. Find and delete EMR security groups
+# First, list them
+aws ec2 describe-security-groups \
+    --filters "Name=group-name,Values=*fraud-detection*EMR*" \
+    --query "SecurityGroups[].{ID:GroupId,Name:GroupName}"
+
+# Revoke all ingress rules (replace SG_ID with actual IDs)
+aws ec2 revoke-security-group-ingress \
+    --group-id SG_ID \
+    --protocol all \
+    --source-group OTHER_SG_ID
+
+# Delete security groups
+aws ec2 delete-security-group --group-id SG_ID
+
+# 3. Delete failed CloudFormation stacks from console
+# Go to CloudFormation → Select stack → Delete → Retain failing resources
+```
+
 ## Cost Optimization
 
 ### EMR Spot Instances
