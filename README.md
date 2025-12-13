@@ -2,13 +2,17 @@
 
 A PySpark-based fraud detection system for insurance claims, deployed on AWS using CDK.
 
+[![Documentation](https://img.shields.io/badge/docs-GitHub%20Pages-blue)](https://caverac.github.io/insurance-fraud-detection/)
+
 ## Overview
 
 This project demonstrates:
-- **Batch processing** of insurance claims using PySpark
+- **Event-driven pipeline** - Automatically triggers when claims data is uploaded to S3
+- **Batch processing** of insurance claims using PySpark on EMR
 - **Rule-based anomaly detection** for flagging unusual billing patterns
 - **Statistical outlier detection** for identifying suspicious charges
 - **Duplicate claim detection** using similarity matching
+- **Partitioned results** for efficient querying with Athena
 
 ## Project Structure
 
@@ -110,6 +114,50 @@ make cdk-deploy
 make cdk-diff
 ```
 
+### Run the Pipeline
+
+```bash
+# Upload claims data to trigger the pipeline
+DATA_BUCKET=$(aws ssm get-parameter \
+    --name "/fraud-detection/data-bucket" \
+    --query "Parameter.Value" --output text)
+
+aws s3 cp claims.csv s3://$DATA_BUCKET/claims/
+
+# Monitor execution
+STATE_MACHINE_ARN=$(aws ssm get-parameter \
+    --name "/fraud-detection/state-machine-arn" \
+    --query "Parameter.Value" --output text)
+
+aws stepfunctions list-executions \
+    --state-machine-arn $STATE_MACHINE_ARN \
+    --max-results 5
+```
+
+### Query Results
+
+After the pipeline completes, query results in Athena:
+
+```sql
+-- Discover new partitions
+MSCK REPAIR TABLE fraud_detection_db.flagged_claims;
+
+-- Query high-risk claims
+SELECT * FROM fraud_detection_db.flagged_claims
+WHERE fraud_score > 0.7
+ORDER BY fraud_score DESC;
+```
+
+### Destroy Infrastructure
+
+```bash
+# Run cleanup script first (handles circular dependencies)
+./packages/infra/scripts/cleanup.sh
+
+# Then destroy stacks
+cd packages/infra && yarn cdk destroy --all
+```
+
 ## Fraud Detection Features
 
 ### Rule-Based Detection
@@ -132,31 +180,34 @@ make cdk-diff
 
 ```mermaid
 flowchart TB
-    subgraph Input
-        A[S3 Raw Data<br/>Claims]
+    Upload[File Upload] --> S3Data
+
+    subgraph EventDriven[Event-Driven Pipeline]
+        S3Data[(S3 Data<br/>Bucket)] --> EventBridge[EventBridge]
+        EventBridge --> StepFunctions[Step Functions]
     end
 
-    subgraph Processing
-        B[EMR Spark<br/>Processing]
+    subgraph Processing[EMR Processing]
+        StepFunctions --> EMR[EMR Cluster<br/>PySpark]
     end
 
     subgraph Output
-        C[S3 Results<br/>Flagged]
-    end
-
-    subgraph Catalog
-        D[Glue Catalog<br/>Metadata]
+        EMR --> S3Results[(S3 Results<br/>Partitioned)]
     end
 
     subgraph Analytics
-        E[Athena<br/>Queries]
+        S3Results --> Glue[Glue Catalog]
+        Glue --> Athena[Athena<br/>Queries]
     end
-
-    A --> B
-    B --> C
-    C --> D
-    D --> E
 ```
+
+### Pipeline Flow
+
+1. **Upload** - Claims CSV uploaded to S3 `claims/` prefix
+2. **Trigger** - EventBridge detects upload, triggers Step Functions
+3. **Process** - EMR cluster spins up, runs PySpark fraud detection
+4. **Store** - Results written to S3, partitioned by `detection_date`
+5. **Query** - Athena queries via Glue Data Catalog
 
 ## Detection Pipeline
 
@@ -179,15 +230,23 @@ flowchart TD
 
 ## Documentation
 
-Build and serve the documentation site:
+Full documentation is available at: **[https://caverac.github.io/insurance-fraud-detection/](https://caverac.github.io/insurance-fraud-detection/)**
+
+Build and serve the documentation locally:
 
 ```bash
-# Serve locally
+# Serve locally with live reload
 make docs-serve
 
 # Build static site
 make docs
 ```
+
+Documentation includes:
+- [AWS Infrastructure](https://caverac.github.io/insurance-fraud-detection/architecture/aws/) - CDK stacks, deployment, and cleanup
+- [Data Flow](https://caverac.github.io/insurance-fraud-detection/architecture/data-flow/) - Pipeline architecture
+- [Running Jobs](https://caverac.github.io/insurance-fraud-detection/guide/jobs/) - Local and AWS execution
+- [API Reference](https://caverac.github.io/insurance-fraud-detection/api/detector/) - Module documentation
 
 ## License
 
